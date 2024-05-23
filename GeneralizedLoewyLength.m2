@@ -39,7 +39,7 @@ genericSystemOfParameters(ZZ,Ideal) := opts -> (c,H) ->(
     I := trim ideal gens gb H;
     if (n := numgens I)<c then error"Ideal has too small codimension.";
     if not isHomogeneous I then error("ideal not homogeneous; 
-	use "inhomogeneousSystemOfParameters" instead");
+	use 'inhomogeneousSystemOfParameters' instead");
 
     den := opts.Density;
     att := opts.Attempts;
@@ -87,7 +87,12 @@ genericSystemOfParameters Ring := opts -> R ->
     Seed => opts.Seed)
 
 genericLoewyLength = method()
-genericLoewyLength Ring := R -> LoewyLength (R / genericSystemOfParameters R)
+genericLoewyLength Ring := R -> (
+    I = trim ideal gens gb ideal R;
+    if isHomogeneous I then LoewyLength (R / genericSystemOfParameters R) else (
+	...
+	-- TODO: add code calling nonHomogeneousSystemOfParameters
+	
 
 generalizedLoewyLength = method(Options => {Attempts => 100})
 -- TODO: Add more options (seed, density)
@@ -96,9 +101,53 @@ generalizedLoewyLength Ring := opts -> R -> (
     gllGuess := min lengths;
     if max lengths != gllGuess then (
 	g := toString flatten entries gens ideal R;
-	print(g | "had diffrent lls for different generic sops")
+	print(g | "had diffrent lls for different generic sops");
+	);
     gllGuess
     )
+    
+isUlrich = method()
+isUlrich Ideal := I -> (
+    R := ring I;
+    m := ideal gens R;
+    dim (R/I) == 0 and numgens trim I == multiplicity ideal vars R
+    )
+    
+type = method()
+type Module := M -> (
+    R := ring M;
+    k := coker vars R;
+    d := dim M;
+    length Ext^d(k,M)
+    )
+type Ideal := I -> type module I
+
+ulrichIndex = method(Options => true)
+ulrichIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
+    if not dim R == 1 then error("Only defined for dimension one rings");
+    local maxPower;
+    if opts.MaxPower == "Multiplicity" then maxPower = multiplicity ideal vars R else maxPower = ops.MaxPower;
+    m := ideal vars R;
+    for i from 1 to maxPower do (
+	if isUlrich m^i then return i
+	);
+    error("MaxPower encountered without obtaining  Index")
+    )
+    
+eliasIndex = method(Options => true)
+eliasIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
+    if not dim R == 1 then error("Only defined for dimension one rings");
+    local maxPower;
+    if opts.MaxPower == "Multiplicity" then maxPower = multiplicity ideal vars R else maxPower = ops.MaxPower;
+    m := ideal vars R;
+    for i from 1 to maxPower do (
+	if type (m^i) == type(R^1/m^i) then return i
+	);
+    error("MaxPower encountered without obtaining Elias Index")
+    )
+    
+        
+    
 -*    
  Conjecture: length ( R / sop ) is minimized for generic SOPs
  Conjecture: ll ( R / sop ) is minimized for generic SOPs    
