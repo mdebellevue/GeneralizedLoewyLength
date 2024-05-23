@@ -89,8 +89,8 @@ genericSystemOfParameters Ring := opts -> R ->
 genericLoewyLength = method()
 genericLoewyLength Ring := R -> (
     I = trim ideal gens gb ideal R;
-    if isHomogeneous I then LoewyLength (R / genericSystemOfParameters R) else (
-	...
+    if isHomogeneous I then LoewyLength (R / genericSystemOfParameters R) else error("Not implemented")
+    )
 	-- TODO: add code calling nonHomogeneousSystemOfParameters
 	
 
@@ -126,7 +126,7 @@ ulrichIndex = method(Options => true)
 ulrichIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
     if not dim R == 1 then error("Only defined for dimension one rings");
     local maxPower;
-    if opts.MaxPower == "Multiplicity" then maxPower = multiplicity ideal vars R else maxPower = ops.MaxPower;
+    if opts.MaxPower === "Multiplicity" then maxPower = multiplicity ideal vars R - 1 else maxPower = ops.MaxPower;
     m := ideal vars R;
     for i from 1 to maxPower do (
 	if isUlrich m^i then return i
@@ -135,17 +135,25 @@ ulrichIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
     )
     
 eliasIndex = method(Options => true)
+-- TODO: Can we upper bound by the multiplicity always?
 eliasIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
     if not dim R == 1 then error("Only defined for dimension one rings");
     local maxPower;
-    if opts.MaxPower == "Multiplicity" then maxPower = multiplicity ideal vars R else maxPower = ops.MaxPower;
+    if opts.MaxPower === "Multiplicity" then maxPower = genericLoewyLength R else maxPower = opts.MaxPower;
     m := ideal vars R;
+    k := coker vars R;
     for i from 1 to maxPower do (
-	if type (m^i) == type(R^1/m^i) then return i
+    -- type(R^1/m^i) will always be 0th ext
+	if rank ambient prune Ext^1(k,m^i) == rank ambient prune Ext^0(k,R^1/m^i) then return i
 	);
     error("MaxPower encountered without obtaining Elias Index")
     )
-    
+
+-- De Stefani Example
+k = ZZ/101
+R = k[x,y,z]/ideal(x^2-y^5,x*y^2+y*z^3-z^5)
+-- Not homogeneous though, so our code doesn't work using type/length
+-- TODO: Fix this problem by removing call to ``length'' and ``
         
     
 -*    
