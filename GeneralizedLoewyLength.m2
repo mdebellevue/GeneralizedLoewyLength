@@ -25,7 +25,10 @@ genericSystemOfParameters = method(
     Options => {Attempts => 100,
 		Density => 0,
 		Seed => null,
-		Verbose => false
+		Verbose => false,
+		Bound => 1,
+		Sparseness => .5,
+		Maximal => true
 	 }
     )
 
@@ -72,36 +75,60 @@ genericSystemOfParameters(ZZ,Ideal) := opts -> (c,H) ->(
 	    Density => min(1.0,den+.1), Attempts =>20, Seed =>J, Verbose => opts.Verbose)
     )
 
-genericSystemOfParameters Ideal := opts -> I -> 
-    genericSystemOfParameters(codim I, I,
-    Density => opts.Density, 
-    Attempts => opts.Attempts,
-    Verbose => opts.Verbose,
-    Seed => opts.Seed)
+genericSystemOfParameters Ideal := opts -> I -> (
+    if isHomogeneous I then genericSystemOfParameters(codim I, I,
+	    Density => opts.Density, 
+	    Attempts => opts.Attempts,
+	    Verbose => opts.Verbose,
+	    Seed => opts.Seed
+	)
+    else ideal(
+	inhomogeneousSystemOfParameters (I, ring I,
+	    Attempts => opts.Attempts,
+	    Bound => opts.Bound,
+	    Sparseness => opts.Sparseness,
+	    Maximal => opts.Maximal
+	    )
+	)
+    )
 
-genericSystemOfParameters Ring := opts -> R ->
-    genericSystemOfParameters(dim R, ideal vars R,
-    Density => opts.Density, 
-    Attempts => opts.Attempts,
-    Verbose => opts.Verbose,
-    Seed => opts.Seed)
+genericSystemOfParameters Ring := opts -> R -> (
+    if isHomogeneous R then (
+	genericSystemOfParameters(dim R, ideal vars R,
+	    Density => opts.Density, 
+	    Attempts => opts.Attempts,
+	    Verbose => opts.Verbose,
+	    Seed => opts.Seed)
+	)
+    else ideal (
+	inhomogeneousSystemOfParameters (ideal vars R, R,
+	    Attempts => opts.Attempts,
+	    Bound => opts.Bound,
+	    Sparseness => opts.Sparseness,
+	    Maximal => opts.Maximal
+	    )
+	)
+    )
 
 genericLoewyLength = method()
 genericLoewyLength Ring := R -> (
-    I = trim ideal gens gb ideal R;
-    if isHomogeneous I then LoewyLength (R / genericSystemOfParameters R) else error("Not implemented")
+    I := trim ideal gens gb ideal R;
+    LoewyLength (R / genericSystemOfParameters R)
     )
-	-- TODO: add code calling nonHomogeneousSystemOfParameters
-	
 
 generalizedLoewyLength = method(Options => {Attempts => 100})
 -- TODO: Add more options (seed, density)
+-- TODO: If res field infinite, then no need to do multiple attempts
 generalizedLoewyLength Ring := opts -> R -> (
     lengths := for i to opts.Attempts list genericLoewyLength R;
     gllGuess := min lengths;
-    if max lengths != gllGuess then (
+    ml := max lengths;
+    if ml != gllGuess then (
 	g := toString flatten entries gens ideal R;
-	print(g | "had diffrent lls for different generic sops");
+	print(g | " had diffrent lls for different generic sops.");
+	print("  They were");
+	print(ml);
+	print(" and");
 	);
     gllGuess
     )
@@ -124,6 +151,7 @@ type Ideal := I -> type module I
 
 ulrichIndex = method(Options => true)
 ulrichIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
+    -- TODO: Use bifurcation method to increase computation speed for rings of high multiplicity
     if not dim R == 1 then error("Only defined for dimension one rings");
     local maxPower;
     if opts.MaxPower === "Multiplicity" then maxPower = multiplicity ideal vars R - 1 else maxPower = ops.MaxPower;
@@ -149,9 +177,52 @@ eliasIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
     error("MaxPower encountered without obtaining Elias Index")
     )
 
+genericEliasIndex = method()
+genericEliasIndex Ring := R -> (
+    -- TODO: Assert that the ring is Cohen Macaulay?
+    I := trim ideal gens gb ideal R;
+    gSop := genericSystemOfParameters R;
+    gSopm1 := ideal drop(flatten entries gens gSop,1);
+    eliasIndex (R / gSopm1)
+    )
+
+generalizedEliasIndex = method(Options => {Attempts => 100})
+-- TODO: Add more options (seed, density)
+generalizedEliasIndex Ring := opts -> R -> (
+    eliasIndices := for i to opts.Attempts list genericEliasIndex R;
+    eliasGuess := min eliasIndices;
+    if max eliasIndices != eliasGuess then (
+	g := toString flatten entries gens ideal R;
+	print(g | "had diffrent lls for different generic sops");
+	);
+    eliasGuess
+    )
+ 
+genericUlrichIndex = method()
+genericUlrichIndex Ring := R -> (
+    I := trim ideal gens gb ideal R;
+    gSop := genericSystemOfParameters R;
+    gSopm1 := ideal drop(flatten entries gens gSop,1);
+    ulrichIndex (R / gSopm1)
+    )
+	-- TODO: add code calling nonHomogeneousSystemOfParameters
+	
+
+generalizedUlrichIndex = method(Options => {Attempts => 100})
+-- TODO: Add more options (seed, density)
+generalizedUlrichIndex Ring := opts -> R -> (
+    ulrichIndices := for i to opts.Attempts list genericUlrichIndex R;
+    ulrichGuess := min ulrichIndices;
+    if max ulrichIndices != ulrichGuess then (
+	g := toString flatten entries gens ideal R;
+	print(g | "had diffrent lls for different generic sops");
+	);
+    ulrichGuess
+    )
+ 
 -- De Stefani Example
-k = ZZ/101
-R = k[x,y,z]/ideal(x^2-y^5,x*y^2+y*z^3-z^5)
+kk = QQ
+R = kk[x,y,z]/ideal(x^2-y^5,x*y^2+y*z^3-z^5)
 -- Not homogeneous though, so our code doesn't work using type/length
 -- TODO: Fix this problem by removing call to ``length'' and ``
         
