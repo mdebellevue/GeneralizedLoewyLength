@@ -3,23 +3,26 @@ needsPackage "Depth"
 --
 -- ll(M) = inf { t | m^t M = 0}    
     
-LoewyLength = method()
-LoewyLength Ring := R -> (
+LoewyLength = method(Options => {Strategy => "HilbertSeries"})
+
+LoewyLength Ring := opts >> R -> (
     if dim R != 0 then error "Ring must be Artinian";
     (degree numerator reduceHilbert hilbertSeries R)#0+1
     )
     -- mm := ideal vars R;
      
-LoewyLength Module := M -> (
+LoewyLength Module := opts >> M -> (
     if dim M != 0 then error "Module must be Artinian";
     (degree numerator reduceHilbert hilbertSeries M)#0+1
     )      
     
-LoewyLength Ideal := I -> (
+LoewyLength Ideal := opts >> I -> (
     R := (ring I)/I;
-    LoewyLength R
+    LoewyLength (R,opts)
     )
     -- mm := ideal vars R;
+
+
     
 genericSystemOfParameters = method(
     Options => {Attempts => 100,
@@ -126,9 +129,7 @@ generalizedLoewyLength Ring := opts -> R -> (
     if ml != gllGuess then (
 	g := toString flatten entries gens ideal R;
 	print(g | " had diffrent lls for different generic sops.");
-	print("  They were");
-	print(ml);
-	print(" and");
+	print("  The max was" + toString(ml) + " and the min was");
 	);
     gllGuess
     )
@@ -161,7 +162,6 @@ ulrichIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
 	);
     error("MaxPower encountered without obtaining  Index")
     )
-    
 eliasIndex = method(Options => true)
 -- TODO: Can we upper bound by the multiplicity always?
 eliasIndex Ring := { MaxPower => "Multiplicity"} >> opts -> R -> (
@@ -185,6 +185,9 @@ genericEliasIndex Ring := R -> (
     gSopm1 := ideal drop(flatten entries gens gSop,1);
     eliasIndex (R / gSopm1)
     )
+    
+isElias = method()
+isElias Ideal := I -> type(I) === type((ring I)^1/I)
 
 generalizedEliasIndex = method(Options => {Attempts => 100})
 -- TODO: Add more options (seed, density)
@@ -222,7 +225,17 @@ generalizedUlrichIndex Ring := opts -> R -> (
  
 -- De Stefani Example
 kk = QQ
-R = kk[x,y,z]/ideal(x^2-y^5,x*y^2+y*z^3-z^5)
+-- R = kk[x,y,z]/ideal(x^2-y^5,x*y^2+y*z^3-z^5)
+
+-- Let's try to localize it
+needsPackage "LocalRings"
+Q = kk[x,y,z]
+Ql = Q_(ideal vars Q)
+I = ideal(x^2-y^5,x*y^2+y*z^3-z^5)
+mm = ideal vars Ql
+gens mm^9
+
+
 -- Not homogeneous though, so our code doesn't work using type/length
 -- TODO: Fix this problem by removing call to ``length'' and ``
         
